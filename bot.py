@@ -199,19 +199,45 @@ def should_enter(price: float, candles: list) -> dict | None:
     lower, upper = nearest_round_levels(price)
     bias = detect_bias(candles)
 
-    # SELL setup: price near upper round level + bearish bias
     dist_upper = abs(price - upper)
-    if dist_upper <= ENTRY_BUFFER and bias == "BEARISH":
-        sl     = round(price + SL_POINTS, 1)
-        target = round(price - SL_POINTS * MIN_RR, 1)
-        return {"side": "sell", "entry": price, "sl": sl, "target": target, "bias": bias}
-
-    # BUY setup: price near lower round level + bullish bias
     dist_lower = abs(price - lower)
-    if dist_lower <= ENTRY_BUFFER and bias == "BULLISH":
-        sl     = round(price - SL_POINTS, 1)
-        target = round(price + SL_POINTS * MIN_RR, 1)
-        return {"side": "buy", "entry": price, "sl": sl, "target": target, "bias": bias}
+
+    # Subhash rule: price near round level = potential trade
+    # Near UPPER level → prefer SELL (resistance)
+    if dist_upper <= ENTRY_BUFFER:
+        # Sell if bearish or neutral (upper = resistance)
+        if bias in ("BEARISH", "NEUTRAL"):
+            sl     = round(price + SL_POINTS, 1)
+            target = round(price - SL_POINTS * MIN_RR, 1)
+            log.info(f"SELL setup @ {price} | upper level {upper} | bias {bias}")
+            return {"side": "sell", "entry": price, "sl": sl, "target": target, "bias": bias}
+
+    # Near LOWER level → prefer BUY (support)
+    if dist_lower <= ENTRY_BUFFER:
+        # Buy if bullish or neutral (lower = support)
+        if bias in ("BULLISH", "NEUTRAL"):
+            sl     = round(price - SL_POINTS, 1)
+            target = round(price + SL_POINTS * MIN_RR, 1)
+            log.info(f"BUY setup @ {price} | lower level {lower} | bias {bias}")
+            return {"side": "buy", "entry": price, "sl": sl, "target": target, "bias": bias}
+
+    # Strong trend override — if price is falling fast, sell at any resistance
+    if len(candles) >= 3:
+        recent = candles[-3:]
+        strong_bear = all(c["close"] < c["open"] for c in recent)
+        strong_bull = all(c["close"] > c["open"] for c in recent)
+
+        if strong_bear and dist_upper <= ENTRY_BUFFER * 2:
+            sl     = round(price + SL_POINTS, 1)
+            target = round(price - SL_POINTS * MIN_RR, 1)
+            log.info(f"STRONG BEAR SELL @ {price} | bias {bias}")
+            return {"side": "sell", "entry": price, "sl": sl, "target": target, "bias": "STRONG_BEAR"}
+
+        if strong_bull and dist_lower <= ENTRY_BUFFER * 2:
+            sl     = round(price - SL_POINTS, 1)
+            target = round(price + SL_POINTS * MIN_RR, 1)
+            log.info(f"STRONG BULL BUY @ {price} | bias {bias}")
+            return {"side": "buy", "entry": price, "sl": sl, "target": target, "bias": "STRONG_BULL"}
 
     return None
 
