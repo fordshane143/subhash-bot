@@ -390,6 +390,10 @@ def main():
         f"SL: {SL_POINTS} pts | Target: 1:{MIN_RR}"
     )
 
+    my_ip = requests.get("https://api.ipify.org").text.strip()
+    log.info(f"==> MY PUBLIC IP: {my_ip} <== Delta whitelist mein daalo!")
+    tg(f"🌐 Railway IP: {my_ip} -- Ye IP Delta API Key whitelist mein daalo!")
+
     balance = get_balance()
     log.info(f"Balance: ${balance:.2f}")
 
